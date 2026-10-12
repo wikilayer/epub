@@ -32,7 +32,8 @@ type Book struct {
 	ContentsTitle string
 	// Modified is when this edition last changed, written to the second.
 	Modified time.Time
-	// Stylesheet is CSS shared by every page of the book.
+	// Stylesheet is CSS shared by every page of the book. It is not read, so
+	// keep every url() in it inside the book.
 	Stylesheet string
 	// Cover names the image, among Images, that a reader shows as the cover.
 	Cover    string
@@ -42,10 +43,11 @@ type Book struct {
 
 // Chapter is one page of the book. Body is an XHTML fragment placed under the
 // chapter's heading; it may show an image as "images/" plus its name, and may
-// hold inline SVG and MathML, but no script, and its resource attributes may
-// not point outside the book. CSS in a style attribute is not read, so keep its
-// url() inside the book too. Children are chapters nested under this one in the table of
-// contents and read after it.
+// hold inline SVG and MathML, but no script, and its src, srcset, href (outside
+// <a>), poster and data attributes may not point outside the book. CSS in a
+// style attribute is not read, so keep its url() inside the book too. Children
+// are chapters nested under this one in the table of contents and read after
+// it.
 type Chapter struct {
 	Title    string
 	Body     string
@@ -216,8 +218,9 @@ func inspect(book Book, chapters []*numbered) error {
 	}
 
 	for i, c := range chapters {
-		at := fmt.Sprintf("chapter %d", i+1)
+		at := fmt.Sprintf("chapter %d %q", i+1, c.Title)
 		if strings.TrimSpace(c.Title) == "" {
+			at = fmt.Sprintf("chapter %d", i+1)
 			errs = append(errs, fmt.Errorf("%s has no title", at))
 		}
 		read, err := readBody(c.Body)
@@ -276,21 +279,28 @@ func readBody(fragment string) (body, error) {
 				return read, errors.New("body carries a script, which this package does not declare")
 			}
 			for _, attr := range t.Attr {
-				if t.Name.Local == "a" || !resourceAttrs[attr.Name.Local] {
+				if t.Name.Local == "a" {
 					continue
 				}
-				target, err := url.Parse(attr.Value)
-				if err != nil {
-					return read, fmt.Errorf("body points at %q, which is not a URL: %w", attr.Value, err)
+				var addresses []string
+				switch {
+				case attr.Name.Local == "srcset":
+					for _, candidate := range strings.Split(attr.Value, ",") {
+						if fields := strings.Fields(candidate); len(fields) > 0 {
+							addresses = append(addresses, fields[0])
+						}
+					}
+				case resourceAttrs[attr.Name.Local]:
+					addresses = []string{attr.Value}
 				}
-				if target.Scheme != "" || target.Host != "" {
-					return read, fmt.Errorf("body loads %s from outside the book, which a book cannot carry", attr.Value)
-				}
-				if target.RawQuery != "" || target.ForceQuery {
-					return read, fmt.Errorf("body points at %s with a query, which a book cannot resolve", attr.Value)
-				}
-				if name, found := strings.CutPrefix(target.Path, "images/"); found {
-					read.images = append(read.images, name)
+				for _, address := range addresses {
+					name, err := resource(address)
+					if err != nil {
+						return read, err
+					}
+					if name != "" {
+						read.images = append(read.images, name)
+					}
 				}
 			}
 		case xml.EndElement:
@@ -298,6 +308,24 @@ func readBody(fragment string) (body, error) {
 			closed = depth == 0
 		}
 	}
+}
+
+func resource(address string) (string, error) {
+	target, err := url.Parse(address)
+	if err != nil {
+		return "", fmt.Errorf("body points at %q, which is not a URL: %w", address, err)
+	}
+	if target.Scheme != "" || target.Host != "" {
+		return "", fmt.Errorf("body loads %s from outside the book, which a book cannot carry", address)
+	}
+	if target.RawQuery != "" || target.ForceQuery {
+		return "", fmt.Errorf("body points at %s with a query, which a book cannot resolve", address)
+	}
+	name, _ := strings.CutPrefix(target.Path, "images/")
+	if name == target.Path {
+		return "", nil
+	}
+	return name, nil
 }
 
 func stylesheetLink(book Book) string {

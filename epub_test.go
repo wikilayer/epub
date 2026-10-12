@@ -179,26 +179,32 @@ func TestWrite_RefusesABookItCannotMakeValid(t *testing.T) {
 		"no modified time":  {func(b *epub.Book) { b.Modified = time.Time{} }, "no Modified"},
 		"no chapters":       {func(b *epub.Book) { b.Chapters = nil }, "no chapters"},
 		"untitled chapter":  {func(b *epub.Book) { b.Chapters[1].Children[0].Title = "" }, "chapter 3 has no title"},
-		"unclosed tag":      {func(b *epub.Book) { b.Chapters[0].Body = "<p>Open" }, "chapter 1: body is not well-formed XML"},
-		"html entity":       {func(b *epub.Book) { b.Chapters[0].Body = "<p>a&nbsp;b</p>" }, "chapter 1: body is not well-formed XML"},
+		"unclosed tag":      {func(b *epub.Book) { b.Chapters[0].Body = "<p>Open" }, `chapter 1 "Front Matter": body is not well-formed XML`},
+		"html entity":       {func(b *epub.Book) { b.Chapters[0].Body = "<p>a&nbsp;b</p>" }, `chapter 1 "Front Matter": body is not well-formed XML`},
 		"body that leaves its section": {func(b *epub.Book) {
 			b.Chapters[0].Body = "<p>One</p></body><body><p>Two</p>"
-		}, "chapter 1: body closes the element it is placed in"},
+		}, `chapter 1 "Front Matter": body closes the element it is placed in`},
 		"script": {func(b *epub.Book) {
 			b.Chapters[0].Body = "<script>alert(1)</script>"
-		}, "chapter 1: body carries a script"},
+		}, `chapter 1 "Front Matter": body carries a script`},
 		"picture from another address": {func(b *epub.Book) {
 			b.Chapters[0].Body = `<p><img src="https://example.com/a.png" alt=""/></p>`
-		}, "chapter 1: body loads https://example.com/a.png from outside the book"},
+		}, `chapter 1 "Front Matter": body loads https://example.com/a.png from outside the book`},
 		"picture from another host by a scheme-relative address": {func(b *epub.Book) {
 			b.Chapters[0].Body = `<p><img src="//example.com/a.png" alt=""/></p>`
-		}, "chapter 1: body loads //example.com/a.png from outside the book"},
+		}, `chapter 1 "Front Matter": body loads //example.com/a.png from outside the book`},
 		"picture with a query": {func(b *epub.Book) {
 			b.Chapters[0].Body = `<p><img src="images/stone.png?v=2" alt=""/></p>`
-		}, "chapter 1: body points at images/stone.png?v=2 with a query"},
+		}, `chapter 1 "Front Matter": body points at images/stone.png?v=2 with a query`},
 		"SVG image from another address": {func(b *epub.Book) {
 			b.Chapters[0].Body = `<svg xmlns="http://www.w3.org/2000/svg"><image href="https://example.com/a.png" width="1" height="1"/></svg>`
-		}, "chapter 1: body loads https://example.com/a.png from outside the book"},
+		}, `chapter 1 "Front Matter": body loads https://example.com/a.png from outside the book`},
+		"one of a srcset from another address": {func(b *epub.Book) {
+			b.Chapters[0].Body = `<p><img src="images/stone.png" srcset="images/stone.png 1x, https://example.com/a.png 2x" alt=""/></p>`
+		}, `chapter 1 "Front Matter": body loads https://example.com/a.png from outside the book`},
+		"one of a srcset the book does not carry": {func(b *epub.Book) {
+			b.Chapters[0].Body = `<p><img src="images/stone.png" srcset="images/missing.png 2x" alt=""/></p>`
+		}, `chapter 1 "Front Matter": body shows images/missing.png`},
 		"image in a folder": {func(b *epub.Book) { b.Images[0].Name = "../stone.png" }, "is not a file name"},
 		"image name a URL would have to escape": {func(b *epub.Book) {
 			b.Images[0].Name = "level stone.png"
@@ -210,7 +216,7 @@ func TestWrite_RefusesABookItCannotMakeValid(t *testing.T) {
 		}, `images "stone.png" and "Stone.png" differ only in case`},
 		"picture the book does not carry": {func(b *epub.Book) {
 			b.Chapters[0].Body = `<p><img src="images/missing.png" alt=""/></p>`
-		}, "chapter 1: body shows images/missing.png, which is not among the images"},
+		}, `chapter 1 "Front Matter": body shows images/missing.png, which is not among the images`},
 		"image without type": {func(b *epub.Book) { b.Images[0].MediaType = "" }, "has no media type"},
 		"two images, one name": {func(b *epub.Book) {
 			b.Images = append(b.Images, b.Images[0])

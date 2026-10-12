@@ -29,13 +29,15 @@ err := epub.Write(w, book)
 ```
 
 `Write` checks the whole book before it writes a byte and returns every fault together, so a book
-it refuses never reaches a reader half-made. Given chapter bodies that are valid XHTML,
-[epubcheck](https://github.com/w3c/epubcheck) accepts what it writes. What a body may hold and
+it refuses never reaches a reader half-made. Given chapter bodies that are valid XHTML and CSS
+that loads nothing from outside the book, [epubcheck](https://github.com/w3c/epubcheck) accepts
+what it writes. What a body may hold and
 what is refused is in the
 [package documentation](https://pkg.go.dev/github.com/wikilayer/epub).
 
 Package [`epubtest`](https://pkg.go.dev/github.com/wikilayer/epub/epubtest) checks a written book
-with epubcheck and reads its parts back, for tests of code that builds books. epubcheck needs Java:
+with epubcheck and reads its parts back, for tests of code that builds books; it brings in testify
+and `golang.org/x/net/html`. epubcheck needs Java:
 `brew install epubcheck` on a Mac, `apt-get install epubcheck` on Debian and Ubuntu.
 
 ## Lines of Code

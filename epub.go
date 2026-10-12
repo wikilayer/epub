@@ -101,6 +101,8 @@ type bookFile struct {
 // the book or shows an image the book does not carry, or an image name a
 // reader could not look up, since a reader would refuse that file or show it
 // broken. Whether a body is valid XHTML beyond that is left to the caller.
+// Once writing has begun, an error from w ends it, and what w already took
+// stays there.
 func Write(w io.Writer, book Book) error {
 	tree, chapters := number(book.Chapters)
 	if err := inspect(book, chapters); err != nil {

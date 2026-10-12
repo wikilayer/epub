@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="{{ x .Book.Language }}" lang="{{ x .Book.Language }}">
+<head>
+  <title>{{ x .Chapter.Title }}</title>
+{{- with .Stylesheet }}
+  <link rel="stylesheet" type="text/css" href="{{ . }}"/>
+{{- end }}
+</head>
+<body>
+  <section epub:type="chapter">
+    <h1>{{ x .Chapter.Title }}</h1>
+    {{ .Chapter.Body }}
+  </section>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id" xml:lang="{{ x .Book.Language }}">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="book-id">{{ x .Book.Identifier }}</dc:identifier>
+    <dc:title>{{ x .Book.Title }}</dc:title>
+    <dc:language>{{ x .Book.Language }}</dc:language>
+{{- with .Book.Creator }}
+    <dc:creator>{{ x . }}</dc:creator>
+{{- end }}
+{{- with .Book.Date }}
+    <dc:date>{{ x . }}</dc:date>
+{{- end }}
+    <meta property="dcterms:modified">{{ .Modified }}</meta>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+{{- with .Stylesheet }}
+    <item id="style" href="{{ . }}" media-type="text/css"/>
+{{- end }}
+{{- range .Chapters }}
+    <item id="{{ .ID }}" href="{{ .File }}" media-type="application/xhtml+xml"{{ with .Properties }} properties="{{ . }}"{{ end }}/>
+{{- end }}
+{{- range $i, $img := .Book.Images }}
+    <item id="image-{{ $i }}" href="images/{{ x $img.Name }}" media-type="{{ x $img.MediaType }}"{{ if eq $img.Name $.Book.Cover }} properties="cover-image"{{ end }}/>
+{{- end }}
+  </manifest>
+  <spine>
+    <itemref idref="nav"/>
+{{- range .Chapters }}
+    <itemref idref="{{ .ID }}"/>
+{{- end }}
+  </spine>
+</package>

@@ -2,7 +2,9 @@ package epub_test
 
 import (
 	"bytes"
+	"encoding/xml"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -45,8 +47,19 @@ func write(t *testing.T, book epub.Book) []byte {
 	return out.Bytes()
 }
 
-func TestWrite_MakesABookEpubcheckAccepts(t *testing.T) {
-	epubtest.RequireValid(t, write(t, sampleBook()))
+type packageDocument struct {
+	Title string `xml:"metadata>title"`
+	Items []struct {
+		Href       string `xml:"href,attr"`
+		Properties string `xml:"properties,attr"`
+	} `xml:"manifest>item"`
+}
+
+func readPackage(t *testing.T, file []byte) packageDocument {
+	t.Helper()
+	var pkg packageDocument
+	require.NoError(t, xml.Unmarshal([]byte(epubtest.Files(t, file)["OEBPS/content.opf"]), &pkg))
+	return pkg
 }
 
 func TestWrite_AcceptsABookWithOnlyWhatIsRequired(t *testing.T) {
@@ -77,10 +90,19 @@ func TestWrite_SharesTheStylesheetWithEveryPage(t *testing.T) {
 
 func TestWrite_TakesAStoredImageAsTheCover(t *testing.T) {
 	book := sampleBook()
-	book.Cover = "stone.png"
+	book.Images = append(book.Images, epub.Image{Name: "delta.png", MediaType: "image/png", Data: epubtest.OnePixelPNG()})
+	book.Chapters[2].Children[0].Body = `<p><img src="images/delta.png" alt="The delta"/></p>`
+	book.Cover = "delta.png"
 	file := write(t, book)
 	epubtest.RequireValid(t, file)
-	assert.Contains(t, epubtest.Files(t, file)["OEBPS/content.opf"], `properties="cover-image"`,
+
+	var covers []string
+	for _, item := range readPackage(t, file).Items {
+		if slices.Contains(strings.Fields(item.Properties), "cover-image") {
+			covers = append(covers, item.Href)
+		}
+	}
+	assert.Equal(t, []string{"images/delta.png"}, covers,
 		"a reader shows the cover the manifest marks, and no other")
 }
 
@@ -141,8 +163,8 @@ func TestWrite_EscapesWhatItWritesAsText(t *testing.T) {
 	file := write(t, book)
 
 	epubtest.RequireValid(t, file)
-	assert.Contains(t, epubtest.Files(t, file)["OEBPS/content.opf"],
-		"<dc:title>Salt &amp; &#34;Pepper&#34; &lt;Volume 2&gt;</dc:title>")
+	assert.Equal(t, `Salt & "Pepper" <Volume 2>`, readPackage(t, file).Title,
+		"a reader lists the book under another title than it was given")
 	assert.Equal(t, "Fish & Chips", epubtest.NavTitles(t, file)[0])
 }
 
